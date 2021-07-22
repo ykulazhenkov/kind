@@ -47,17 +47,6 @@ func (a *Action) Execute(ctx *actions.ActionContext) error {
 		return err
 	}
 
-	// join secondary control plane nodes if any
-	secondaryControlPlanes, err := nodeutils.SecondaryControlPlaneNodes(allNodes)
-	if err != nil {
-		return err
-	}
-	if len(secondaryControlPlanes) > 0 {
-		if err := joinSecondaryControlPlanes(ctx, secondaryControlPlanes); err != nil {
-			return err
-		}
-	}
-
 	// then join worker nodes if any
 	workers, err := nodeutils.SelectNodesByRole(allNodes, constants.WorkerNodeRoleValue)
 	if err != nil {

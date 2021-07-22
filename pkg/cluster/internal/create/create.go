@@ -19,6 +19,7 @@ package create
 import (
 	"fmt"
 	"math/rand"
+	"sigs.k8s.io/kind/pkg/cluster/internal/create/actions/kubeadmjoin"
 	"time"
 
 	"github.com/alessio/shellescape"
@@ -33,12 +34,6 @@ import (
 
 	"sigs.k8s.io/kind/pkg/cluster/internal/create/actions"
 	configaction "sigs.k8s.io/kind/pkg/cluster/internal/create/actions/config"
-	"sigs.k8s.io/kind/pkg/cluster/internal/create/actions/installcni"
-	"sigs.k8s.io/kind/pkg/cluster/internal/create/actions/installstorage"
-	"sigs.k8s.io/kind/pkg/cluster/internal/create/actions/kubeadminit"
-	"sigs.k8s.io/kind/pkg/cluster/internal/create/actions/kubeadmjoin"
-	"sigs.k8s.io/kind/pkg/cluster/internal/create/actions/loadbalancer"
-	"sigs.k8s.io/kind/pkg/cluster/internal/create/actions/waitforready"
 	"sigs.k8s.io/kind/pkg/cluster/internal/kubeconfig"
 )
 
@@ -106,27 +101,9 @@ func Cluster(logger log.Logger, p providers.Provider, opts *ClusterOptions) erro
 		return err
 	}
 
-	// TODO(bentheelder): make this controllable from the command line?
 	actionsToRun := []actions.Action{
-		loadbalancer.NewAction(), // setup external loadbalancer
-		configaction.NewAction(), // setup kubeadm config
-	}
-	if !opts.StopBeforeSettingUpKubernetes {
-		actionsToRun = append(actionsToRun,
-			kubeadminit.NewAction(opts.Config), // run kubeadm init
-		)
-		// this step might be skipped, but is next after init
-		if !opts.Config.Networking.DisableDefaultCNI {
-			actionsToRun = append(actionsToRun,
-				installcni.NewAction(), // install CNI
-			)
-		}
-		// add remaining steps
-		actionsToRun = append(actionsToRun,
-			installstorage.NewAction(),                // install StorageClass
-			kubeadmjoin.NewAction(),                   // run kubeadm join
-			waitforready.NewAction(opts.WaitForReady), // wait for cluster readiness
-		)
+		configaction.NewAction(),
+		kubeadmjoin.NewAction(), // run kubeadm join
 	}
 
 	// run all actions
@@ -143,20 +120,6 @@ func Cluster(logger log.Logger, p providers.Provider, opts *ClusterOptions) erro
 	// skip the rest if we're not setting up kubernetes
 	if opts.StopBeforeSettingUpKubernetes {
 		return nil
-	}
-
-	// try exporting kubeconfig with backoff for locking failures
-	// TODO: factor out into a public errors API w/ backoff handling?
-	// for now this is easier than coming up with a good API
-	var err error
-	for _, b := range []time.Duration{0, time.Millisecond, time.Millisecond * 50, time.Millisecond * 100} {
-		time.Sleep(b)
-		if err = kubeconfig.Export(p, opts.Config.Name, opts.KubeconfigPath); err == nil {
-			break
-		}
-	}
-	if err != nil {
-		return err
 	}
 
 	// optionally display usage

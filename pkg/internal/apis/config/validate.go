@@ -84,12 +84,6 @@ func (c *Cluster) Validate() error {
 		}
 	}
 
-	// there must be at least one control plane node
-	numControlPlane, anyControlPlane := numByRole[ControlPlaneRole]
-	if !anyControlPlane || numControlPlane < 1 {
-		errs = append(errs, errors.Errorf("must have at least one %s node", string(ControlPlaneRole)))
-	}
-
 	if len(errs) > 0 {
 		return errors.NewAggregate(errs)
 	}
